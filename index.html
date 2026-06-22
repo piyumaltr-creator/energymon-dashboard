@@ -20,6 +20,7 @@
     <nav class="sidebar-nav">
       <div class="nav-section">Views</div>
       <button class="nav-item active" data-page="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+	  <button class="nav-item" data-page="history"><i class="ti ti-history"></i>History</button>
       <button class="nav-item" data-page="meters"><i class="ti ti-device-analytics"></i>Meters</button>
 	  <button class="nav-item" data-page="modbus"><i class="ti ti-books"></i>Model Library</button>
       <button class="nav-item" data-page="mqtt"><i class="ti ti-cloud"></i>MQTT Config</button>
@@ -67,6 +68,12 @@
         <div class="dashboard-grid" id="dashboard-grid"></div>
 
       </section>
+		
+		<!-- ── History ── -->
+		<section class="page" id="page-history">
+	    	<div class="tab-bar" id="history-tabs"></div>
+	    	<div id="history-container"></div>
+	  	</section>
 
       <!-- ── Meters ── -->
       <section class="page" id="page-meters">
