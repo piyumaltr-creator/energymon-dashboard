@@ -675,3 +675,9 @@ setMqttStatus(false, 'Disconnected');
 connLog('info', 'Dashboard started');
 connLog('info', 'Connecting to broker.hivemq.com:8000 (ws://) …');
 MqttClient.connect({ host: 'broker.hivemq.com', port: 8000, tls: false, qos: 0 });
+
+ // Initialize historical data
+History.init(                                            
+   'https://dmqcedbxndiondaygoic.supabase.co',  // your URL      
+   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtcWNlZGJ4bmRpb25kYXlnb2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwODMxNDYsImV4cCI6MjA5NzY1OTE0Nn0.cXJtz7YG4W1P8l9m5wdthvkZZab2dKIUj1puiVsFz7Q'                    // anon key      
+ );                                                       
