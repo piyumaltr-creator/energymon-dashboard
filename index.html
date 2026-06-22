@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnergyMon — MQTT Meter Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo"><i class="ti ti-bolt"></i> EnergyMon</span>
+      <p class="logo-sub">PUSR DR164 · MQTT</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Views</div>
+      <button class="nav-item active" data-page="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+      <button class="nav-item" data-page="meters"><i class="ti ti-device-analytics"></i>Meters</button>
+	  <button class="nav-item" data-page="modbus"><i class="ti ti-books"></i>Model Library</button>
+      <button class="nav-item" data-page="mqtt"><i class="ti ti-cloud"></i>MQTT Config</button>
+      <div class="nav-section" style="margin-top:12px">Live Meters</div>
+      <div id="meter-nav"></div>
+    </nav>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <header class="topbar">
+      <h2 id="page-title">Dashboard</h2>
+      <span class="status-ind">
+        <span class="dot dot-red" id="mqtt-status-dot"></span>
+        <span id="mqtt-status-label">Disconnected</span>
+      </span>
+      <span class="badge badge-info" id="meter-count">0 meters</span>
+    </header>
+
+    <div class="content">
+
+      <!-- ── Dashboard ── -->
+      <section class="page active" id="page-dashboard">
+
+        <!-- Meter tabs + toolbar -->
+        <div class="dash-toolbar">
+          <div class="tab-bar" id="meter-tabs" style="border:none;margin:0;flex:1"></div>
+          <div class="dash-actions">
+            <button class="btn btn-sm" id="dashboard-reset-btn" style="display:none">
+              <i class="ti ti-refresh"></i>Reset layout
+            </button>
+            <button class="btn btn-sm" id="dashboard-copy-btn" style="display:none">
+              <i class="ti ti-copy"></i>Copy layout to…
+            </button>
+            <button class="btn btn-sm btn-primary" id="dashboard-add-btn" style="display:none">
+              <i class="ti ti-plus"></i>Add component
+            </button>
+            <button class="btn btn-sm" id="dashboard-edit-btn">
+              <i class="ti ti-edit"></i>Edit dashboard
+            </button>
+          </div>
+        </div>
+
+        <!-- Component grid -->
+        <div class="dashboard-grid" id="dashboard-grid"></div>
+
+      </section>
+
+      <!-- ── Meters ── -->
+      <section class="page" id="page-meters">
+        <div class="card">
+          <div class="card-header">
+            <i class="ti ti-device-analytics"></i>
+            <h3>Installed Meters</h3>
+            <button class="btn btn-primary btn-sm" id="add-meter-btn">
+              <i class="ti ti-plus"></i>Add meter
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name / Location</th><th>Model</th><th>Slave ID</th>
+                  <th>MQTT topic</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="meter-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Model Library ── -->
+      <section class="page" id="page-modbus">
+        <div class="model-toolbar">
+          <div class="model-toolbar-left">
+            <select id="modbus-model-sel" class="select-sm" style="min-width:180px"></select>
+            <button class="btn btn-sm" id="edit-model-btn"><i class="ti ti-edit"></i>Rename</button>
+            <button class="btn btn-sm btn-danger" id="delete-model-btn"><i class="ti ti-trash"></i>Delete model</button>
+          </div>
+          <div class="model-toolbar-right">
+            <button class="btn btn-sm" id="export-regs-btn"><i class="ti ti-download"></i>Export JSON</button>
+            <button class="btn btn-primary btn-sm" id="add-model-btn"><i class="ti ti-plus"></i>New model</button>
+          </div>
+        </div>
+        <div class="model-info-strip" id="model-info-strip">
+          <span id="model-info-name" class="model-info-name"></span>
+          <span class="model-info-sep">·</span>
+          <span id="model-info-count" class="model-info-count"></span>
+          <span class="model-info-sep">·</span>
+          <span id="model-info-used" class="model-info-used"></span>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <i class="ti ti-circuit-board"></i>
+            <h3>Register Addresses</h3>
+            <span class="badge badge-info" id="reg-count">0 registers</span>
+            <button class="btn btn-primary btn-sm" id="add-reg-btn" style="margin-left:auto">
+              <i class="ti ti-plus"></i>Add register
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>#</th><th>Parameter</th><th>Register addr</th><th>FC</th>
+                    <th>Data type</th><th>Byte order</th><th>Scale</th><th>Unit</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="reg-tbody"></tbody>
+            </table>
+          </div>
+          <div id="reg-empty" class="empty-state" style="display:none">
+            <i class="ti ti-circuit-board"></i>
+            <p>No registers yet. Click <strong>Add register</strong> to define the Modbus addresses for this model.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── MQTT Config ── -->
+      <section class="page" id="page-mqtt">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><i class="ti ti-cloud"></i><h3>MQTT Broker</h3></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-broker">Broker host</label>
+                <input type="text" id="cfg-broker" value="broker.hivemq.com">
+              </div>
+              <div class="form-group">
+                <label for="cfg-port">TCP port (gateway)</label>
+                <input type="number" id="cfg-port" value="1883">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-user">Username</label>
+                <input type="text" id="cfg-user" placeholder="optional">
+              </div>
+              <div class="form-group">
+                <label for="cfg-pass">Password</label>
+                <input type="password" id="cfg-pass" placeholder="optional">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-clientid">Client ID</label>
+                <input type="text" id="cfg-clientid" value="energymon-dashboard-01">
+              </div>
+              <div class="form-group">
+                <label for="cfg-qos">QoS level</label>
+                <select id="cfg-qos">
+                  <option value="0" selected>0 – At most once</option>
+                  <option value="1">1 – At least once</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-ws-port">WebSocket port <span style="font-weight:400;color:var(--text-tertiary)">(browser)</span></label>
+                <input type="number" id="cfg-ws-port" value="8000">
+              </div>
+              <div class="form-group">
+                <label for="cfg-tls">WebSocket TLS</label>
+                <select id="cfg-tls">
+                  <option value="0" selected>Disabled (ws://)</option>
+                  <option value="1">Enabled (wss://)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary btn-sm" id="mqtt-save-btn">Connect</button>
+              <button class="btn btn-sm" id="mqtt-test-btn">Test</button>
+              <button class="btn btn-sm btn-danger" id="mqtt-disconnect-btn" style="display:none">
+                <i class="ti ti-plug-x"></i>Disconnect
+              </button>
+              <span class="status-ind" id="mqtt-conn-status">
+                <span class="dot dot-red"></span>Disconnected
+              </span>
+            </div>
+            <div class="info-box" style="margin-top:12px;background:#fffbea;border-color:#e8c84a">
+              <p class="info-title" style="color:#7a5c00"><i class="ti ti-alert-triangle"></i> Browser needs WebSocket port</p>
+              <p class="info-body" style="color:#7a5c00">
+                <strong>HiveMQ:</strong> WS port <code>8000</code> or WSS <code>8884</code><br>
+                <strong>Mosquitto:</strong> add <code>listener 9001</code> + <code>protocol websockets</code>
+              </p>
+            </div>
+            <div style="border-top:0.5px solid var(--border-light);margin-top:14px;padding-top:14px">
+              <div class="info-box">
+                <p class="info-title"><i class="ti ti-info-circle"></i> Modbus frame topics</p>
+                <p class="info-body">
+                  The dashboard subscribes to the MQTT topic of each meter automatically.<br>
+                  To change the topic, edit the meter on the <strong>Meters</strong> page.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connection log + Raw MQTT console -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <div class="card">
+              <div class="card-header">
+                <i class="ti ti-terminal"></i><h3>Connection log</h3>
+                <button class="btn btn-sm" id="clear-log-btn" style="margin-left:auto">Clear</button>
+              </div>
+              <div id="conn-log"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <i class="ti ti-radio"></i><h3>Live raw MQTT console</h3>
+                <button class="btn btn-sm" id="clear-raw-log-btn" style="margin-left:auto">Clear</button>
+              </div>
+              <div class="debug-toolbar">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="raw-autoscroll" checked style="width:auto">
+                  <span>Auto-scroll</span>
+                </label>
+                <span class="debug-hint">Shows topic, raw payload, and decode result.</span>
+              </div>
+              <div id="raw-log" class="raw-log"></div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Add/Edit Meter Modal ── -->
+<div class="modal-backdrop" id="meter-modal" style="display:none">
+  <div class="modal">
+    <h3 id="modal-title">Add meter</h3>
+    <p class="modal-desc">Assign an installed meter to a location. The model defines which registers are read.</p>
+    <div class="form-row">
+      <div class="form-group"><label for="m-name">Meter name / label</label><input type="text" id="m-name" placeholder="e.g. Main Incomer"></div>
+      <div class="form-group"><label for="m-model">Meter model</label><select id="m-model"></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label for="m-slave">Modbus slave ID</label><input type="number" id="m-slave" value="1" min="1" max="247"></div>
+      <div class="form-group"><label for="m-topic">MQTT topic</label><input type="text" id="m-topic" value="sensorjip/data"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label for="m-loc">Location / description</label><input type="text" id="m-loc" placeholder="e.g. MCC Room A"></div>
+      <div class="form-group"><label for="m-ct">CT ratio</label><input type="text" id="m-ct" placeholder="e.g. 200/5"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1"><label for="m-notes">Notes</label><input type="text" id="m-notes" placeholder="optional"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-save">Add meter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add/Rename Model Modal ── -->
+<div class="modal-backdrop" id="model-modal" style="display:none">
+  <div class="modal" style="max-width:400px">
+    <h3 id="model-modal-title">New meter model</h3>
+    <p class="modal-desc">Define meter brand/type and its register addresses. Then assign to meters on the Meters page.</p>
+    <div class="form-group">
+      <label for="m-model-name">Model name</label>
+      <input type="text" id="m-model-name" placeholder="e.g. Schneider PM5350">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="model-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="model-modal-save">Create model</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Register Modal ── -->
+<div class="modal-backdrop" id="reg-modal" style="display:none">
+  <div class="modal">
+    <h3 id="reg-modal-title">Add register</h3>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label for="r-param">Parameter name</label>
+        <input type="text" id="r-param" placeholder="e.g. Voltage L1-N">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label for="r-addr">Register address <span style="font-weight:400;color:var(--text-tertiary)">(decimal, from manual)</span></label><input type="text" id="r-addr" placeholder="e.g. 3000 or 24"></div>
+      <div class="form-group"><label for="r-fc">Function code</label>
+        <select id="r-fc"><option value="03">FC03 – Holding Registers</option><option value="04">FC04 – Input Registers</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label for="r-dtype">Data type</label>
+        <select id="r-dtype"><option>UINT16</option><option>INT16</option><option>UINT32</option><option>INT32</option><option>FLOAT32</option><option>4Q_FP_PF</option></select>
+      </div>
+      <div class="form-group"><label for="r-byteorder">Byte order</label>
+        <select id="r-byteorder">
+          <option value="AB CD">AB CD (big-endian)</option><option value="CD AB">CD AB (mid-big)</option>
+          <option value="BA DC">BA DC (mid-little)</option><option value="DC BA">DC BA (little-endian)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label for="r-scale">Scale factor</label><input type="text" id="r-scale" value="1"></div>
+      <div class="form-group"><label for="r-unit">Unit</label><input type="text" id="r-unit" placeholder="e.g. V, A, kW"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="reg-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="reg-modal-save">Add register</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add/Edit Dashboard Component Modal ── -->
+<div class="modal-backdrop" id="comp-modal" style="display:none">
+  <div class="modal" style="max-width:540px">
+    <h3 id="comp-modal-title">Add component</h3>
+
+    <!-- Type picker row -->
+    <div class="comp-type-picker" id="comp-type-picker">
+      <button class="type-btn active" data-type="kpi">
+        <i class="ti ti-123"></i><span>KPI Card</span>
+      </button>
+      <button class="type-btn" data-type="chart">
+        <i class="ti ti-chart-line"></i><span>Line Chart</span>
+      </button>
+      <button class="type-btn" data-type="gauge">
+        <i class="ti ti-dashboard"></i><span>Gauge</span>
+      </button>
+      <button class="type-btn" data-type="bar">
+        <i class="ti ti-chart-bar"></i><span>Bar</span>
+      </button>
+      <button class="type-btn" data-type="table">
+        <i class="ti ti-table"></i><span>Table</span>
+      </button>
+      <button class="type-btn" data-type="energy">
+        <i class="ti ti-bolt"></i><span>Energy kWh</span>
+      </button>
+    </div>
+    <input type="hidden" id="comp-type" value="kpi">
+
+    <div style="border-top:0.5px solid var(--border-light);margin:12px 0 14px"></div>
+
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1">
+        <label for="comp-title">Title</label>
+        <input type="text" id="comp-title" placeholder="e.g. Voltage L1-N">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" id="group-comp-param">
+        <label for="comp-param">Parameter <span style="font-weight:400;color:var(--text-tertiary)">(from meter model)</span></label>
+        <input type="text" id="comp-param" placeholder="e.g. Voltage L1-N" list="param-suggestions" autocomplete="off">
+        <datalist id="param-suggestions"></datalist>
+      </div>
+      <div class="form-group" id="group-comp-unit">
+        <label for="comp-unit">Unit</label>
+        <input type="text" id="comp-unit" placeholder="e.g. V, A, kW">
+      </div>
+    </div>
+
+    <div class="form-group" id="group-comp-params" style="display:none">
+      <label for="comp-params">Parameters <span style="font-weight:400;color:var(--text-tertiary)">(one per line)</span></label>
+      <textarea id="comp-params" rows="5"
+        style="width:100%;font-size:12px;padding:6px 8px;border-radius:var(--radius-md);border:0.5px solid var(--border-mid);font-family:var(--font-mono);resize:vertical"
+        placeholder="Voltage L1-N&#10;Voltage L2-N&#10;Voltage L3-N&#10;Current L1"></textarea>
+    </div>
+
+    <!-- Energy kWh date range fields (shown only for energy type) -->
+    <div id="group-energy-dates" style="display:none">
+      <div style="border-top:0.5px solid var(--border-light);margin:4px 0 12px"></div>
+      <p style="font-size:11px;color:var(--text-secondary);margin-bottom:10px">
+        <i class="ti ti-info-circle" style="vertical-align:-2px"></i>
+        Calculates energy consumed between two datetimes. The start value is captured from the live meter reading — subtract it from the current reading to get consumption over the period.
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="comp-energy-from">From (start datetime)</label>
+          <input type="datetime-local" id="comp-energy-from">
+        </div>
+        <div class="form-group">
+          <label for="comp-energy-to">To (end datetime)</label>
+          <input type="datetime-local" id="comp-energy-to">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="comp-energy-param">Energy parameter</label>
+          <input type="text" id="comp-energy-param" placeholder="e.g. Active energy import" list="param-suggestions" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="comp-energy-startval">Start reading (kWh at From time)</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="number" id="comp-energy-startval" placeholder="auto-captured" step="0.001" style="flex:1">
+            <button type="button" class="btn btn-sm btn-primary" id="comp-energy-capture-btn">
+              <i class="ti ti-crosshair"></i>Capture now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row" id="row-comp-decimals-maxval">
+      <div class="form-group" id="group-comp-decimals">
+        <label for="comp-decimals">Decimal places</label>
+        <input type="number" id="comp-decimals" value="1" min="0" max="6">
+      </div>
+      <div class="form-group" id="group-comp-maxval" style="display:none">
+        <label for="comp-maxval">Max value (for scale)</label>
+        <input type="number" id="comp-maxval" value="300">
+      </div>
+      <div class="form-group" id="group-comp-height" style="display:none">
+        <label for="comp-height">Chart height</label>
+        <select id="comp-height">
+          <option value="small">Small (110px)</option>
+          <option value="medium" selected>Medium (170px)</option>
+          <option value="large">Large (250px)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="comp-width">Width</label>
+        <select id="comp-width">
+          <option value="quarter">¼ width</option>
+          <option value="third">⅓ width</option>
+          <option value="half">½ width</option>
+          <option value="full">Full width</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Accent color</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input type="color" id="comp-color" value="#185FA5"
+            style="width:36px;height:30px;border:0.5px solid var(--border-mid);border-radius:6px;padding:2px;cursor:pointer;flex-shrink:0">
+          <div id="color-swatches" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="comp-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="comp-modal-save">Add component</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Copy Layout Modal ── -->
+<div class="modal-backdrop" id="copy-layout-modal" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <h3>Copy layout to other meters</h3>
+    <p style="font-size:12px;color:var(--text-secondary);margin:-8px 0 14px">
+      Select which meters should receive this dashboard layout. Their existing layouts will be replaced.
+    </p>
+    <div id="copy-layout-targets" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>
+    <div class="modal-actions">
+      <button class="btn" id="copy-layout-cancel">Cancel</button>
+      <button class="btn btn-primary" id="copy-layout-confirm"><i class="ti ti-copy"></i>Copy layout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/modbus-decoder.js"></script>
+<script src="js/mqtt.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
