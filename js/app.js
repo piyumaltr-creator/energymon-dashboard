@@ -21,7 +21,13 @@ function toast(msg) {
 }
 
 /* ─── Page navigation ─── */
-const PAGE_TITLES = { dashboard:'Dashboard', meters:'Meters', modbus:'Model Library', mqtt:'MQTT & Gateway Config' };
+const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  meters:    'Meters',
+  modbus:    'Model Library',
+  mqtt:      'MQTT & Gateway Config',
+  history:   'History',
+};
 
 function switchPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -30,8 +36,9 @@ function switchPage(name) {
   document.querySelector(`.nav-item[data-page="${name}"]`)?.classList.add('active');
   document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
   if (name === 'dashboard') { renderMeterTabs(); Dashboard.render(activeMeter); }
+  if (name === 'meters')    renderMeterTable();
   if (name === 'modbus')    renderModbusPage();
-  if (name === 'history') renderHistoryPage();
+  if (name === 'history')   renderHistoryPage();
 }
 
 document.querySelectorAll('.nav-item[data-page]').forEach(btn =>
@@ -86,22 +93,6 @@ function setMqttStatus(connected, label) {
   // Show disconnect button only when connected
   const discBtn = document.getElementById('mqtt-disconnect-btn');
   if (discBtn) discBtn.style.display = connected ? '' : 'none';
-}
-
-function renderHistoryPage() {
-const tabs = document.getElementById('history-tabs');
-tabs.innerHTML = meters.map(m =>
-<button class="tab ${m.id === activeMeter ? 'active' : ''}"         data-mid="${m.id}">${m.name}</button>
-).join('');
-tabs.querySelectorAll('.tab').forEach(t => {
-t.addEventListener('click', () => {
-tabs.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-t.classList.add('active');
-History.renderPanel(+t.dataset.mid,
-meters.find(m=>m.id===+t.dataset.mid)?.name, 'history-container');
-});
-});
-if (meters[0]) History.renderPanel(meters[0].id, meters[0].name, 'history-container');
 }
 
 MqttClient.on('onConnect', () => {
@@ -646,12 +637,12 @@ function _applySubscriptions() {
 }
 
 function doConnect() {
-  const host     = document.getElementById('cfg-broker').value.trim()  || 'ac7e077d45df4016ac900325418f450c.s1.eu.hivemq.cloud';
-  const wsPort   = +document.getElementById('cfg-ws-port').value        || 8884;
+  const host     = document.getElementById('cfg-broker').value.trim()  || 'broker.hivemq.com';
+  const wsPort   = +document.getElementById('cfg-ws-port').value        || 8000;
   const tls      = document.getElementById('cfg-tls').value === '1';
   const clientId = document.getElementById('cfg-clientid').value.trim() || ('energymon-' + Math.random().toString(16).slice(2,10));
-  const username = document.getElementById('cfg-user').value.trim() || 'energymon';
-  const password = document.getElementById('cfg-pass').value || 'Ptr@36xx';
+  const username = document.getElementById('cfg-user').value.trim();
+  const password = document.getElementById('cfg-pass').value;
   const qos      = +document.getElementById('cfg-qos').value;
 
   setMqttStatus(false, 'Connecting…');
@@ -680,6 +671,41 @@ function renderAll() {
   renderMeterNav(); renderMeterTable(); renderMeterTabs();
 }
 
+/* ─── History page ─── */
+function renderHistoryPage() {
+  // If history.js is loaded and Supabase is configured, use it
+  if (typeof History !== 'undefined' && History.renderPanel) {
+    const tabs = document.getElementById('history-tabs');
+    const container = document.getElementById('history-container');
+    if (!tabs || !container) return;
+    tabs.innerHTML = meters.map(m =>
+      `<button class="tab ${m.id === activeMeter ? 'active' : ''}" data-mid="${m.id}">${m.name}</button>`
+    ).join('');
+    tabs.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        tabs.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        t.classList.add('active');
+        History.renderPanel(+t.dataset.mid, meters.find(m => m.id === +t.dataset.mid)?.name, 'history-container');
+      });
+    });
+    if (meters[0]) History.renderPanel(meters[0].id, meters[0].name, 'history-container');
+  } else {
+    // history.js not loaded yet — show setup instructions
+    const container = document.getElementById('history-container');
+    if (container) container.innerHTML = `
+      <div style="text-align:center;padding:48px 24px;color:var(--text-tertiary)">
+        <i class="ti ti-database" style="font-size:40px;display:block;margin-bottom:12px"></i>
+        <p style="font-size:14px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Historical data not configured</p>
+        <p style="font-size:13px;max-width:400px;margin:0 auto;line-height:1.6">
+          To enable history, deploy the Cloudflare Worker bridge and add
+          <code style="background:var(--bg-secondary);padding:2px 5px;border-radius:4px">history.js</code>
+          to this project, then call <code style="background:var(--bg-secondary);padding:2px 5px;border-radius:4px">History.init(url, key)</code>
+          in app.js.
+        </p>
+      </div>`;
+  }
+}
+
 /* ═══════════════════════════════════════════════
    BOOT
    ═══════════════════════════════════════════════ */
@@ -692,9 +718,3 @@ setMqttStatus(false, 'Disconnected');
 connLog('info', 'Dashboard started');
 connLog('info', 'Connecting to broker.hivemq.com:8000 (ws://) …');
 MqttClient.connect({ host: 'broker.hivemq.com', port: 8000, tls: false, qos: 0 });
-
- // Initialize historical data
-History.init(                                            
-   'https://dmqcedbxndiondaygoic.supabase.co',  // your URL      
-   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtcWNlZGJ4bmRpb25kYXlnb2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwODMxNDYsImV4cCI6MjA5NzY1OTE0Nn0.cXJtz7YG4W1P8l9m5wdthvkZZab2dKIUj1puiVsFz7Q'                    // anon key      
- );                                                       
