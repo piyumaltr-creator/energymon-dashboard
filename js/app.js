@@ -31,6 +31,7 @@ function switchPage(name) {
   document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
   if (name === 'dashboard') { renderMeterTabs(); Dashboard.render(activeMeter); }
   if (name === 'modbus')    renderModbusPage();
+  if (name === 'history') renderHistoryPage();
 }
 
 document.querySelectorAll('.nav-item[data-page]').forEach(btn =>
@@ -85,6 +86,22 @@ function setMqttStatus(connected, label) {
   // Show disconnect button only when connected
   const discBtn = document.getElementById('mqtt-disconnect-btn');
   if (discBtn) discBtn.style.display = connected ? '' : 'none';
+}
+
+function renderHistoryPage() {
+const tabs = document.getElementById('history-tabs');
+tabs.innerHTML = meters.map(m =>
+<button class="tab ${m.id === activeMeter ? 'active' : ''}"         data-mid="${m.id}">${m.name}</button>
+).join('');
+tabs.querySelectorAll('.tab').forEach(t => {
+t.addEventListener('click', () => {
+tabs.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+t.classList.add('active');
+History.renderPanel(+t.dataset.mid,
+meters.find(m=>m.id===+t.dataset.mid)?.name, 'history-container');
+});
+});
+if (meters[0]) History.renderPanel(meters[0].id, meters[0].name, 'history-container');
 }
 
 MqttClient.on('onConnect', () => {
