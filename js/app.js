@@ -629,12 +629,12 @@ function _applySubscriptions() {
 }
 
 function doConnect() {
-  const host     = document.getElementById('cfg-broker').value.trim()  || 'broker.hivemq.com';
-  const wsPort   = +document.getElementById('cfg-ws-port').value        || 8000;
+  const host     = document.getElementById('cfg-broker').value.trim()  || 'ac7e077d45df4016ac900325418f450c.s1.eu.hivemq.cloud';
+  const wsPort   = +document.getElementById('cfg-ws-port').value        || 8884;
   const tls      = document.getElementById('cfg-tls').value === '1';
   const clientId = document.getElementById('cfg-clientid').value.trim() || ('energymon-' + Math.random().toString(16).slice(2,10));
-  const username = document.getElementById('cfg-user').value.trim();
-  const password = document.getElementById('cfg-pass').value;
+  const username = document.getElementById('cfg-user').value.trim() || 'energymon';
+  const password = document.getElementById('cfg-pass').value || 'Ptr@36xx';
   const qos      = +document.getElementById('cfg-qos').value;
 
   setMqttStatus(false, 'Connecting…');
